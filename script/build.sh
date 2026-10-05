@@ -63,69 +63,63 @@ if [[ $# -eq 1 && $1 == "toolchain" ]]; then
   # cd ../
   # ln -s build ../build/buildbot_osx/llvm-macosx-x86_64/
   # popd > /dev/null
+  exit 0
+fi
+
+mkdir -p build/
+cd build/
+
+if [[ -e build.ninja ]]; then
+  echo "Reuse existing build.ninja (cmake options in build.sh are not re-applied; rm -rf build/ to reconfigure)"
 else
-  mkdir -p build/
-  cd build/
-  if [[ ! -e Makefile ]]; then
-    use_ccache="false"
-    if [ $(which ccache) ]; then
-      use_ccache="true"
-    fi
-
-    if [[ "_$OS" = "_Windows_NT" ]]; then
-      cmake \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DLLVM_ENABLE_DUMP=ON \
-        -DLLVM_ENABLE_ZSTD=OFF \
-        -DLLVM_INCLUDE_BENCHMARKS=OFF \
-        -DLLVM_INCLUDE_EXAMPLES=OFF \
-        -DLLVM_INCLUDE_TESTS=OFF \
-        -DLLVM_ENABLE_PROJECTS="clang" \
-        -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
-        -DCLANG_DEFAULT_RTLIB="libgcc" \
-        -DLLVM_CCACHE_BUILD=${use_ccache}\
-        -DLLVM_USE_CRT_RELEASE=MT \
-        -DLLVM_USE_CRT_RELWITHDEBINFO=MT \
-        -A x64\
-        -Thost=x64\
-          -G "Visual Studio 17 2022" ../llvm
-
-    else
-      echo "Build for $build_arch"
-      cmake \
-        -DLLVM_ENABLE_DUMP=ON \
-        -DLLVM_ENABLE_ZSTD=OFF \
-        -DLLVM_INCLUDE_BENCHMARKS=OFF \
-        -DLLVM_INCLUDE_EXAMPLES=OFF \
-        -DLLVM_INCLUDE_TESTS=OFF \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DLLVM_ENABLE_PROJECTS="clang" \
-        -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
-        -DCLANG_DEFAULT_RTLIB="libgcc" \
-        -DCMAKE_OSX_ARCHITECTURES="$build_arch" \
-        -DLLVM_CCACHE_BUILD=${use_ccache} \
-          -G "Unix Makefiles" ../llvm
-    fi
-
+  use_ccache="false"
+  if [ $(which ccache) ]; then
+    use_ccache="true"
   fi
 
-# -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AARCH64;X64" \
-
   if [[ "_$OS" = "_Windows_NT" ]]; then
-    echo "Build Release x64 in Visual Studio"
-    echo '"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" && msbuild  /p:Configuration=Release;Platform=x64 tools\clang\tools\driver\clang.vcxproj' > build.bat
-    MSYS_NO_PATHCONV=1 cmd /c build.bat
-  else
-    make llvm-headers
-    make -j 16
-  fi
+    cmake \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DLLVM_ENABLE_DUMP=ON \
+      -DLLVM_ENABLE_ZSTD=OFF \
+      -DLLVM_INCLUDE_BENCHMARKS=OFF \
+      -DLLVM_INCLUDE_EXAMPLES=OFF \
+      -DLLVM_INCLUDE_TESTS=OFF \
+      -DLLVM_ENABLE_PROJECTS="clang" \
+      -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+      -DCLANG_DEFAULT_RTLIB="libgcc" \
+      -DLLVM_CCACHE_BUILD=${use_ccache}\
+      -DLLVM_USE_CRT_RELEASE=MT \
+      -DLLVM_USE_CRT_RELWITHDEBINFO=MT \
+      -A x64\
+      -Thost=x64\
+        -G "Visual Studio 17 2022" ../llvm
 
-  # cp prebuilt libraries
-  if [[ "_$OS" = "_Windows_NT" ]]; then
-    cp -r ../script/lib Release
   else
-    cp -r ../script/lib .
+    echo "Build for $build_arch"
+    cmake \
+      -DLLVM_ENABLE_DUMP=ON \
+      -DLLVM_ENABLE_ZSTD=OFF \
+      -DLLVM_INCLUDE_BENCHMARKS=OFF \
+      -DLLVM_INCLUDE_EXAMPLES=OFF \
+      -DLLVM_INCLUDE_TESTS=OFF \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DLLVM_ENABLE_PROJECTS="clang" \
+      -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+      -DCLANG_DEFAULT_RTLIB="libgcc" \
+      -DCMAKE_OSX_ARCHITECTURES="$build_arch" \
+      -DLLVM_CCACHE_BUILD=${use_ccache} \
+        -G Ninja ../llvm
   fi
 fi
- 
+
+if [[ "_$OS" = "_Windows_NT" ]]; then
+  echo "Build Release x64 in Visual Studio"
+  echo '"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" && msbuild  /p:Configuration=Release;Platform=x64 tools\clang\tools\driver\clang.vcxproj' > build.bat
+  MSYS_NO_PATHCONV=1 cmd /c build.bat
+else
+  ninja llvm-headers
+  ninja
+fi
+
 popd > /dev/null
